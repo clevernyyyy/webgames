@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TANK BATTLE</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪖</text></svg>">
+<style>
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 700;
+  font-style: normal;
+  src: url('/roboto-bold.woff2') format('woff2');
+  font-display: swap;
+}
+</style>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0a0f; color:#e0e0e0; font-family:'Courier New',monospace; overflow:hidden; }
+canvas { display:block; }
+
+/* ── Join screen ── */
+#join {
+  position:fixed; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:18px;
+  background:linear-gradient(160deg,#0a0a1a 0%,#0d1a0d 100%);
+  z-index:100;
+}
+#join h1 {
+  font-size:clamp(2.5rem,8vw,6rem); font-weight:900; letter-spacing:.15em;
+  color:#4ade80; text-shadow:0 0 40px #4ade8088, 0 0 80px #4ade8044;
+  animation: pulse 2s ease-in-out infinite;
+}
+#join p.sub { color:#6b7280; font-size:.9rem; letter-spacing:.1em; }
+#join input {
+  padding:12px 24px; font-size:1.1rem; font-family:inherit;
+  background:#111827; border:2px solid #374151; border-radius:8px;
+  color:#e0e0e0; width:280px; text-align:center; outline:none;
+  transition:border-color .2s;
+}
+#join input:focus { border-color:#4ade80; }
+#join button {
+  padding:14px 48px; font-size:1.2rem; font-weight:700; font-family:inherit;
+  background:#16a34a; border:none; border-radius:8px; color:#fff;
+  cursor:pointer; letter-spacing:.12em; transition:background .2s, transform .1s;
+}
+#join button:hover { background:#15803d; transform:translateY(-2px); }
+#join button:active { transform:translateY(0); }
+.tip { color:#4b5563; font-size:.78rem; text-align:center; line-height:1.7; }
+.how-to-play {
+  display:flex; gap:24px; margin-top:4px; flex-wrap:wrap; justify-content:center;
+}
+.htp-col {
+  background:rgba(255,255,255,.04); border:1px solid #1f2937;
+  border-radius:10px; padding:12px 18px; min-width:210px;
+}
+.htp-col h3 {
+  font-size:.65rem; letter-spacing:.18em; color:#4ade80;
+  margin-bottom:8px; text-transform:uppercase;
+}
+.htp-row {
+  display:flex; align-items:baseline; gap:8px;
+  font-size:.72rem; line-height:1.8;
+}
+.htp-key {
+  color:#e0e0e0; white-space:nowrap; flex-shrink:0; min-width:80px; text-align:left;
+}
+.htp-desc { color:#6b7280; }
+.htp-pickup { display:flex; align-items:flex-start; gap:8px; font-size:.72rem; line-height:1.9; }
+.htp-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.htp-pickup-desc { color:#6b7280; }
+@keyframes pulse { 0%,100%{text-shadow:0 0 40px #4ade8088,0 0 80px #4ade8044}
+                   50%{text-shadow:0 0 60px #4ade80cc,0 0 120px #4ade8066} }
+
+/* ── HUD ── */
+#hud { position:fixed; inset:0; pointer-events:none; z-index:10; display:none; }
+
+/* Health */
+#health-wrap {
+  position:absolute; top:16px; left:16px;
+  background:rgba(0,0,0,.6); border:1px solid #374151;
+  border-radius:10px; padding:10px 14px; min-width:160px;
+}
+#player-name { font-size:.75rem; color:#6b7280; letter-spacing:.1em; margin-bottom:6px; }
+#hearts { font-size:1.4rem; letter-spacing:4px; }
+.boost-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+.boost-pill {
+  font-size:.68rem; padding:3px 8px; border-radius:20px; letter-spacing:.05em;
+  background:#1f2937; border:1px solid currentColor; display:none;
+}
+.boost-pill.active { display:inline-block; animation:pillPop .2s ease; }
+.bp-speed  { color:#f59e0b; }
+.bp-shield { color:#38bdf8; }
+.bp-ammo   { color:#f87171; }
+.bp-bomb   { color:#888888; }
+
+/* Crosshair */
+#crosshair {
+  display:none;
+}
+#crosshair::before,#crosshair::after {
+  content:''; position:absolute; background:rgba(255,255,255,.75);
+  border-radius:1px;
+}
+#crosshair::before { width:2px; height:100%; left:50%; top:0; transform:translateX(-50%); }
+#crosshair::after  { width:100%; height:2px; top:50%; left:0; transform:translateY(-50%); }
+
+/* Pitch meter */
+#pitch-meter {
+  display:none;
+}
+#pitch-bar-wrap {
+  width:160px; height:8px; background:#1f2937;
+  border-radius:4px; margin:6px auto 0;
+  position:relative; overflow:hidden;
+}
+#pitch-bar { height:100%; background:#4ade80; border-radius:4px; transition:width .05s; }
+#pitch-label { font-size:.7rem; color:#9ca3af; letter-spacing:.1em; }
+#pitch-deg   { font-size:1rem; color:#4ade80; font-weight:700; }
+
+/* Leaderboard */
+#leaderboard {
+  position:absolute; top:16px; right:16px;
+  background:rgba(0,0,0,.65); border:1px solid #374151;
+  border-radius:10px; padding:10px 14px; min-width:190px;
+}
+#leaderboard h3 { font-size:.7rem; color:#6b7280; letter-spacing:.15em; margin-bottom:8px; }
+.lb-row {
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:.78rem; padding:2px 0; gap:8px;
+}
+.lb-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100px; }
+.lb-kd   { color:#6b7280; flex-shrink:0; }
+.lb-me   { font-weight:700; }
+
+/* Kill feed */
+#killfeed {
+  position:absolute; bottom:16px; right:16px;
+  display:flex; flex-direction:column; align-items:flex-end; gap:5px;
+  max-width:320px;
+}
+.kf-entry {
+  background:rgba(0,0,0,.7); border:1px solid #374151;
+  border-radius:6px; padding:5px 10px;
+  font-size:.75rem; animation:kfSlide .3s ease;
+  transition:opacity .5s;
+}
+@keyframes kfSlide { from{transform:translateX(30px);opacity:0} to{transform:none;opacity:1} }
+
+/* Respawn */
+#respawn-overlay {
+  position:absolute; inset:0; display:none;
+  flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  background:rgba(0,0,0,.55);
+}
+#respawn-overlay h2 { font-size:2.5rem; color:#f87171; text-shadow:0 0 20px #f8717188; }
+#respawn-overlay p  { color:#9ca3af; font-size:1rem; }
+#respawn-count      { font-size:3rem; font-weight:900; color:#fbbf24; }
+
+/* Controls hint */
+#controls {
+  position:absolute; bottom:16px; left:16px;
+  color:#ffffff; font-size:.68rem; line-height:1.9; letter-spacing:.05em;
+}
+
+/* View badge */
+#view-badge {
+  position:absolute; top:16px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,.6); border:1px solid #374151; border-radius:20px;
+  padding:5px 16px; font-size:.75rem; letter-spacing:.1em; color:#9ca3af;
+}
+
+/* Minimap */
+#minimap {
+  position:absolute; bottom:16px; right:16px;
+  width:200px; height:200px;
+  background:rgba(0,0,0,.6); border:1px solid #374151; border-radius:8px;
+  overflow:hidden;
+}
+#minimap canvas { display:block; }
+
+/* FP reticle */
+#fp-reticle {
+  display:none;
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  pointer-events:none; z-index:15;
+}
+
+/* Pickup toast */
+#pickup-toast {
+  position:absolute; top:50%; left:50%; transform:translate(-50%, -80px);
+  font-size:1rem; font-weight:700; padding:8px 20px;
+  background:rgba(0,0,0,.75); border-radius:20px;
+  opacity:0; transition:opacity .3s; pointer-events:none;
+}
+
+@keyframes pillPop { from{transform:scale(.7)}to{transform:scale(1)} }
+</style>
+</head>
+<body>
+
+<!-- Join screen -->
+<div id="join">
+  <h1>TANK BATTLE</h1>
+  <p class="sub">MULTIPLAYER · ARC PHYSICS · NO MERCY</p>
+  <input id="nameInput" placeholder="Callsign…" maxlength="16" autocomplete="off" spellcheck="false">
+  <button id="playBtn">BATTLE</button>
+  <div class="how-to-play">
+    <div class="htp-col">
+      <h3>Standard Mode</h3>
+      <div class="htp-row"><span class="htp-key">W / S</span><span class="htp-desc">Forward / reverse</span></div>
+      <div class="htp-row"><span class="htp-key">A / D</span><span class="htp-desc">Turn left / right</span></div>
+      <div class="htp-row"><span class="htp-key">Mouse</span><span class="htp-desc">Aim turret</span></div>
+      <div class="htp-row"><span class="htp-key">Click/Space</span><span class="htp-desc">Fire 🔥</span></div>
+      <h3 style="margin-top:16px">Mouse-Drive Mode <span style="color:#6b7280;font-size:.6rem;letter-spacing:.1em">( press M )</span></h3>
+      <div class="htp-row"><span class="htp-key">Mouse</span><span class="htp-desc">Steers tank + aims</span></div>
+      <div class="htp-row"><span class="htp-key">W / S</span><span class="htp-desc">Forward / reverse</span></div>
+      <div class="htp-row"><span class="htp-key">Click/Space</span><span class="htp-desc">Fire 🔥</span></div>
+    </div>
+    <div class="htp-col">
+      <h3>Pickups</h3>
+      <div class="htp-pickup"><span class="htp-dot" style="background:#f59e0b"></span><span class="htp-pickup-desc"><b style="color:#f59e0b">Speed</b> — 2× speed for 11 s</span></div>
+      <div class="htp-pickup"><span class="htp-dot" style="background:#38bdf8"></span><span class="htp-pickup-desc"><b style="color:#38bdf8">Shield</b> — blocks one hit for 9 s</span></div>
+      <div class="htp-pickup"><span class="htp-dot" style="background:#ef4444"></span><span class="htp-pickup-desc"><b style="color:#ef4444">Ammo</b> — 20 rounds of rapid fire</span></div>
+      <div class="htp-pickup"><span class="htp-dot" style="background:#4ade80"></span><span class="htp-pickup-desc"><b style="color:#4ade80">Health</b> — restore 1 heart (max 5)</span></div>
+      <div class="htp-pickup"><span class="htp-dot" style="background:#888"></span><span class="htp-pickup-desc"><b style="color:#aaa">Bomb</b> — next shot is an area blast:<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;−3 ❤️ or strips shield</span></div>
+      <h3 style="margin-top:16px">View Point</h3>
+      <div class="htp-pickup"><span class="htp-pickup-desc"><b style="color:#e0e0e0">V</b> — toggle first-person view</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Game canvas -->
+<canvas id="game"></canvas>
+
+<!-- HUD (hidden until joined) -->
+<div id="hud">
+  <!-- Health + boosts -->
+  <div id="health-wrap">
+    <div id="player-name">CALLSIGN</div>
+    <div id="hearts">❤️❤️❤️</div>
+    <div class="boost-row">
+      <span class="boost-pill bp-speed"  id="bp-speed" >⚡ SPEED  <span id="speed-t"></span>s</span>
+      <span class="boost-pill bp-shield" id="bp-shield">🛡 SHIELD <span id="shield-t"></span>s</span>
+      <span class="boost-pill bp-ammo"   id="bp-ammo"  >🔥 RAPID  ×<span id="ammo-n"></span></span>
+      <span class="boost-pill bp-bomb"   id="bp-bomb"  >💣 BOMB READY</span>
+    </div>
+  </div>
+
+  <!-- Crosshair -->
+  <div id="crosshair"></div>
+
+  <!-- Pitch meter -->
+  <div id="pitch-meter">
+    <div id="pitch-label">AIM ANGLE</div>
+    <div id="pitch-deg">15°</div>
+    <div id="pitch-bar-wrap"><div id="pitch-bar" style="width:25%"></div></div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div id="leaderboard">
+    <h3>▸ LEADERBOARD</h3>
+    <div id="lb-rows"></div>
+  </div>
+
+  <!-- Kill feed -->
+  <div id="killfeed"></div>
+
+  <!-- Minimap -->
+  <div id="minimap"><canvas id="minimap-canvas" width="200" height="200"></canvas></div>
+
+  <!-- FP reticle (SVG tank sight — shown only in first-person mode) -->
+  <div id="fp-reticle">
+    <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="36" cy="36" r="20" stroke="rgba(255,255,255,0.72)" stroke-width="1" fill="none"/>
+      <line x1="36" y1="4"  x2="36" y2="14" stroke="rgba(255,255,255,0.72)" stroke-width="1.5"/>
+      <line x1="36" y1="58" x2="36" y2="68" stroke="rgba(255,255,255,0.72)" stroke-width="1.5"/>
+      <line x1="4"  y1="36" x2="14" y2="36" stroke="rgba(255,255,255,0.72)" stroke-width="1.5"/>
+      <line x1="58" y1="36" x2="68" y2="36" stroke="rgba(255,255,255,0.72)" stroke-width="1.5"/>
+      <circle cx="36" cy="36" r="2" fill="rgba(255,255,255,0.9)"/>
+    </svg>
+  </div>
+
+  <!-- Pickup toast -->
+  <div id="pickup-toast"></div>
+
+  <!-- Respawn overlay -->
+  <div id="respawn-overlay">
+    <h2>💥 DESTROYED</h2>
+    <div id="respawn-count">5</div>
+    <p>Respawning…</p>
+  </div>
+
+  <!-- View badge -->
+  <div id="view-badge">🗺 OVERHEAD</div>
+
+  <!-- Controls hint -->
+  <div id="controls">
+    WASD move · MOUSE aim · CLICK/SPACE fire · M mode · V view
+  </div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "/three.module.js" } }
+</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
