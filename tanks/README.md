@@ -2,7 +2,11 @@
 
 Multiplayer tank battle game for LAN play.
 
-## Running
+## Play it
+
+Live at **[tanks.adamschaal.com](https://tanks.adamschaal.com)** — no setup required.
+
+## Running locally
 
 ```bash
 docker compose up
