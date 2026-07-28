@@ -2,7 +2,8 @@
  * server.js — Tank Battle multiplayer server
  * Authoritative physics at 30 Hz. Clients send input; server simulates everything.
  */
-const express = require('express');
+const express     = require('express');
+const compression = require('compression');
 const { WebSocketServer } = require('ws');
 const https = require('https');
 const http  = require('http');
@@ -408,7 +409,8 @@ function tick() {
 
 // ─── Network ──────────────────────────────────────────────────────────────────
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(compression());
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 const httpServer  = http.createServer(app);
 
@@ -473,7 +475,7 @@ function onConnection(ws) {
         id: ws._id,
         worldSize: WORLD_SIZE,
         maxHealth: MAX_HEALTH,
-        spawnX: p.x, spawnZ: p.z,   // so client can snap camera immediately
+        spawnX: p.x, spawnZ: p.z, spawnYaw: p.yaw,
         obstacles,
         pickups: pickups.map(({ id, type, x, z }) => ({ id, type, x, z })),
       }));

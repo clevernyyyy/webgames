@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TANK BATTLE</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪖</text></svg>">
+<link rel="modulepreload" href="/three.module.js">
 <style>
 @font-face {
   font-family: 'Roboto';
@@ -204,7 +205,7 @@ canvas { display:block; }
 <div id="join">
   <h1>TANK BATTLE</h1>
   <p class="sub">MULTIPLAYER · ARC PHYSICS · NO MERCY</p>  <input id="nameInput" placeholder="Callsign…" maxlength="16" autocomplete="off" spellcheck="false">
-  <button id="playBtn">BATTLE</button>
+  <button id="playBtn" disabled>LOADING…</button>
   <div class="how-to-play">
     <div class="htp-col">
       <h3>Standard Mode</h3>

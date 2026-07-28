@@ -599,25 +599,30 @@ function connect(name) {
 }
 
 function sendInput() {
-  if (!ws || ws.readyState !== 1 || !myId) return;
+  if (!ws || ws.readyState !== 1 || myId === null) return;
   const me = gameState?.players?.find(p => p.id === myId);
-  if (!me || me.dead) return;
+  if (me?.dead) return;  // only bail if server confirmed we're dead
+
+  // Fall back to predicted position while waiting for first state message
+  const tankX   = me?.x   ?? predX;
+  const tankZ   = me?.z   ?? predZ;
+  const tankYaw = me?.yaw ?? predYaw;
 
   let turretYaw;
   let pitch;
 
   let targetYaw;
   if (fpMode) {
-    turretYaw = fpYaw - me.yaw;
+    turretYaw = fpYaw - tankYaw;
     pitch     = fpPitch;
   } else if (mouseDriveMode) {
-    const wYaw = overheadTurretYaw(me.x, me.z);
+    const wYaw = overheadTurretYaw(tankX, tankZ);
     targetYaw  = wYaw;   // server rotates body toward this
     turretYaw  = 0;      // turret aligned with body
     pitch      = turretPitch;
   } else {
-    const wYaw = overheadTurretYaw(me.x, me.z);
-    turretYaw  = wYaw - me.yaw;
+    const wYaw = overheadTurretYaw(tankX, tankZ);
+    turretYaw  = wYaw - tankYaw;
     pitch      = turretPitch;
   }
 
@@ -642,20 +647,24 @@ function handleMsg(msg) {
       maxHealth = msg.maxHealth;
 
       // Init prediction from spawn so no snap on first state
-      predX = msg.spawnX ?? 0;
-      predZ = msg.spawnZ ?? 0;
-      predYaw = 0;
+      predX   = msg.spawnX   ?? 0;
+      predZ   = msg.spawnZ   ?? 0;
+      predYaw = msg.spawnYaw ?? 0;
       predReady = true;
 
       // Snap camera to spawn before showing game
       camera.position.set(msg.spawnX ?? 0, 110, (msg.spawnZ ?? 0) + 60);
       camera.lookAt(msg.spawnX ?? 0, 0, msg.spawnZ ?? 0);
 
-      document.getElementById('join').style.display = 'none';
-      document.getElementById('hud').style.display  = 'block';
-
       buildWorld(msg.obstacles, msg.pickups);
       buildMountains();
+      // Pre-compile all WebGL shaders so the first rendered frame is smooth.
+      // On first load the GPU has no shader cache; without this every new material
+      // compiles on its first draw call, causing a visible stutter.
+      renderer.compile(scene, camera);
+
+      document.getElementById('join').style.display = 'none';
+      document.getElementById('hud').style.display  = 'block';
       break;
     }
     case 'state':    { gameState = msg; syncMeshes(msg); updateHUD(msg); break; }
@@ -887,8 +896,11 @@ function animate() {
   // Client-side prediction: advance local position from inputs every frame.
   // Server state blends in gradually (reconciliation above) so there's never
   // a hard snap — movement is always 60 fps smooth regardless of tick rate.
-  let smoothX = me?.x ?? 0, smoothZ = me?.z ?? 0;
-  if (predReady && me && !me.dead) {
+  // Use predX/Z immediately from welcome (before first state arrives) so the
+  // tank responds to input without waiting up to 33 ms for the first state.
+  let smoothX = predReady ? predX : (me?.x ?? 0);
+  let smoothZ = predReady ? predZ : (me?.z ?? 0);
+  if (predReady && (!me || !me.dead)) {
     const fwd = (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
     if (mouseDriveMode) {
       // Snap predYaw toward mouse direction
@@ -913,7 +925,7 @@ function animate() {
   }
 
   // ── Camera
-  if (me) {
+  if (predReady) {
     if (fpMode) {
       // First-person: sit just behind the barrel pivot at barrel height.
       const cosP = Math.cos(fpPitch);
@@ -944,7 +956,7 @@ function animate() {
       }
       camera.lookAt(smoothX, 0, smoothZ);
 
-      if (!me.dead) {
+      if (!me?.dead) {
         const wYaw = overheadTurretYaw(smoothX, smoothZ);
         updateTrajectory(smoothX, smoothZ, wYaw, turretPitch);
       } else {
@@ -1045,5 +1057,9 @@ $('playBtn').onclick = () => {
 $('nameInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') $('playBtn').click();
 });
+
+// Module fully loaded — unlock the join button
+$('playBtn').disabled = false;
+$('playBtn').textContent = 'BATTLE';
 
 animate();
