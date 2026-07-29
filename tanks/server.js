@@ -410,7 +410,17 @@ function tick() {
 // ─── Network ──────────────────────────────────────────────────────────────────
 const app = express();
 app.use(compression());
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
+// Cache large immutable assets (three.js) for 1 day; force freshness checks on
+// game logic files so deploys are picked up immediately.
+app.use(express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  setHeaders(res, filePath) {
+    const name = path.basename(filePath);
+    if (name === 'game.js' || name === 'index.html') {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 const httpServer  = http.createServer(app);
 

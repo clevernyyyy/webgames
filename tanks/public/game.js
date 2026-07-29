@@ -723,10 +723,10 @@ function syncMeshes(state) {
         predX = pd.x; predZ = pd.z; predYaw = pd.yaw;
         predReady = true;
       } else {
-        // Blend prediction toward authoritative server position
-        predX   += (pd.x   - predX)   * 0.25;
-        predZ   += (pd.z   - predZ)   * 0.25;
-        predYaw += (pd.yaw - predYaw) * 0.25;
+        // Blend prediction toward authoritative server position (gentle to avoid visible jitter)
+        predX   += (pd.x   - predX)   * 0.1;
+        predZ   += (pd.z   - predZ)   * 0.1;
+        predYaw += (pd.yaw - predYaw) * 0.1;
       }
     }
   }
@@ -991,9 +991,9 @@ function animate() {
       group.position.z += (entry.targetZ - group.position.z) * Math.min(1, dt * 12);
     }
 
-    // Body yaw — direct for local player, lerped for remotes
+    // Body yaw — use predicted yaw for local (60fps smooth), lerped for remotes
     if (isLocal) {
-      group.rotation.y = entry.targetYaw;
+      group.rotation.y = predYaw;
     } else {
       let dyaw = entry.targetYaw - group.rotation.y;
       while (dyaw >  Math.PI) dyaw -= Math.PI * 2;
@@ -1010,7 +1010,7 @@ function animate() {
       if (isLocal && fpMode) {
         turret.rotation.y = fpYaw - group.rotation.y;
       } else if (isLocal) {
-        turret.rotation.y = overheadTurretYaw(pd.x, pd.z) - group.rotation.y;
+        turret.rotation.y = overheadTurretYaw(smoothX, smoothZ) - group.rotation.y;
       } else {
         // Smooth remote turret
         let dty = pd.turretYaw - entry.turretYaw;
